@@ -108,6 +108,24 @@ const textOf = (content) =>
     .map((c) => c.text)
     .join("\n");
 
+// `ram hook` emits either plain markdown (session-start, daemon path) or a
+// JSON envelope ("{"additionalContext": …}" or "{"hookSpecificOutput": {
+// "additionalContext": …}}"). Inject only the context text: the envelope is
+// token noise in pi (every injection, every escaped newline) and muddies the
+// `<context source="ram">` marker boundaries that consumers strip on (ramem
+// #107). Any parse failure degrades to the raw string — additive-only
+// invariants unchanged.
+function injectText(out) {
+  if (!out) return out;
+  try {
+    const v = JSON.parse(out);
+    const ctx = v?.hookSpecificOutput?.additionalContext ?? v?.additionalContext;
+    return typeof ctx === "string" && ctx ? ctx : out;
+  } catch {
+    return out;
+  }
+}
+
 export default (pi) => {
   let sessionContextDone = false;
   let lastUserPrompt = "";
@@ -152,13 +170,15 @@ export default (pi) => {
       if (!sessionContextDone) {
         sessionContextDone = true;
         const out = await runHook("session-start", base, HOOK_TIMEOUTS_MS["session-start"], ctx.signal);
-        if (out) parts.push(out);
+        const text = injectText(out);
+        if (text) parts.push(text);
       }
       if (lastUserPrompt) {
         const prompt = lastUserPrompt;
         lastUserPrompt = "";
         const out = await runHook("user-prompt", { ...base, prompt }, HOOK_TIMEOUTS_MS["user-prompt"], ctx.signal);
-        if (out) parts.push(out);
+        const text = injectText(out);
+        if (text) parts.push(text);
       }
       if (parts.length > 0) {
         return {
@@ -196,8 +216,9 @@ export default (pi) => {
           ctx.signal,
         );
       }
-      if (out) {
-        return { content: [...(event.content ?? []), { type: "text", text: out }] };
+      const text = injectText(out);
+      if (text) {
+        return { content: [...(event.content ?? []), { type: "text", text }] };
       }
     } catch {}
   });

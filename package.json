@@ -1,6 +1,6 @@
 {
   "name": "pi-ram",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "RAM (ramem) long-term memory for pi: deterministic context injection driven by the ram hook handlers",
   "type": "module",
   "license": "MIT",
