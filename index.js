@@ -211,12 +211,17 @@ export default (pi) => {
       } else if (event.toolName === "bash") {
         // Pass the structured failure signal through (issue #109 R6): the
         // hook's exit-code gate needs it to distinguish a real failure from
-        // output that merely mentions the word "error".
+        // output that merely mentions the word "error". The command rides
+        // along in tool_input: the hook's relevance gate matches the fix
+        // memory against the command as well as the error text, and its
+        // search query prefers the command's tokens.
         const response = { stdout: textOf(event.content) };
         if (typeof event.isError === "boolean") response.isError = event.isError;
+        const tool_input = {};
+        if (typeof event.input?.command === "string") tool_input.command = event.input.command;
         out = await runHook(
           "post-tool-error",
-          { ...base, tool_name: "Bash", tool_response: response },
+          { ...base, tool_name: "Bash", tool_input, tool_response: response },
           HOOK_TIMEOUTS_MS["post-tool-error"],
           ctx.signal,
         );
